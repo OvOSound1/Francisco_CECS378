@@ -17,9 +17,20 @@ def collect_data_from_url(url):
         'url': url
     }
     response = requests.post(FIRECRAWL_URL, headers=headers, json=json_data)
-    response.raise_for_status()
-    return response.json().get('text', '')
-
+    try:
+        response.raise_for_status()
+    except requests.RequestException as e:
+        print(f"HTTP error {e}")
+        try:
+            print("Response content:", response.json())
+        except Exception:
+            print("Response content:", response.text)
+        raise
+    data = response.json()
+    if not data.get('success'):
+        print("Full API response:", data)
+        return data.get('text') or data.get('data', {}).get('markdown', '')
+    
 # Process with LLM
 def process_with_llm(content):
     print("\nProcessing content with offline LLM...")
@@ -28,8 +39,7 @@ def process_with_llm(content):
         messages=[{
             'role': 'user',
             'content': (
-                "Please summarize and extract key actionable insights "
-                "from the following content for a cybersecurity student:\n\n"
+                "Please summarize and extract key actionable insights from the following content for a cybersecurity student:\n\n"
                 f"{content}"
             )
         }]
@@ -41,10 +51,12 @@ def generate_pdf(content, filename="agentic_ai_summary.pdf"):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
+
     for line in content.split('\n'):
         pdf.multi_cell(0, 10, line)
+
     pdf.output(filename)
-    print(f"\nPDF report generated: {filename}")
+    print(f"PDF report generated: {filename}")
 
 # Main Execution
 def main():
